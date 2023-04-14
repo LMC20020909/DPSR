@@ -1,5 +1,6 @@
 import csv
 
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -9,6 +10,7 @@ import os
 
 # 获取word在六维上的投影值
 def get_dims(word):
+    word = word.lower()
     conn = sqlite3.connect("six_dims.db")
     cursor = conn.cursor()
     dims = cursor.execute("SELECT Vision, Motor, Socialness, Emotion_abs, Time, Space FROM bert_English WHERE word = ?",
@@ -51,7 +53,7 @@ def write_data(df, where):
     global user, secret, indexes, guesses, scores, df_single_start, df_single_end
     data = []
     file_exists = os.path.exists("delta.csv")
-    header = ["user", "from", "index", "word_t", "word_t1", "Vision", "Motor", "Socialness", "Emotion_abs+1", "Time", "Space"]
+    header = ["user", "from", "index", "word_t", "word_t1", "Vision", "Motor", "Socialness", "Emotion_abs+1", "Time", "Space", "score_t", "score_t1"]
     with open("delta.csv", "a", encoding="UTF8", newline='') as f:
         writer = csv.writer(f)
         if not file_exists:
@@ -61,16 +63,18 @@ def write_data(df, where):
             word_t1 = df['guess'][i + 1]
             dims_t = get_dims(word_t)
             dims_t1 = get_dims(word_t1)
-            differences = [b - a for b, a in zip(dims_t1, dims_t)]
-            new_row = [user, where, i + 1, word_t, word_t1] + differences
+            if len(dims_t) > 0 and len(dims_t1) > 0:
+                differences = [b - a for b, a in zip(dims_t1, dims_t)]
+            else:
+                differences = [np.nan] * 6
+            new_row = [user, where, i + 1, word_t, word_t1] + differences + [df['score'][i], df['score'][i + 1]]
             data.append(new_row)
         writer.writerows(data)
 
 
 if __name__ == '__main__':
-    tasks = ["chair_president", "chair_sofa", "light_heavy", "light_sun", "meet_discuss", "meet_reach",
-             "president_chair",
-             "reach_meet"]
+    tasks = ["chair_president", "light_heavy", "meet_reach"]
+    # tasks = ["meet_reach"]
     for task in tasks:
         df = pd.read_csv(f"./2_csv/{task}.csv")
         df = df.sort_values(by=['user'], ignore_index=True)
